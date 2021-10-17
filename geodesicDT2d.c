@@ -604,6 +604,20 @@ int main(int argc, char* argv[]) {
   fp = fopen(argv[4],"r");
   fread(domain,sizeof(float),max1*max2,fp);
   fclose(fp);
+  
+  /* codigo control */
+  float max = -10;
+  float min = 999999;
+  for (int i=0;i<max1*max2;i++) {
+        if (domain[i] > max) {
+            max = domain[i];
+        } 
+        if (domain[i] < min) {
+            min = domain[i];
+        } 
+  }
+  printf("image min %f max %f\n", min, max);
+  /* codigo control */
 
   numasignaciones = 0;
   printf("Entrando en geodesicDT\n");

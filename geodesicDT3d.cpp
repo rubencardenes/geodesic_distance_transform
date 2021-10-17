@@ -6,6 +6,11 @@
 #include <string.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <ctype.h>
+#include <getopt.h>
+#include <iostream>
+#include "io_mhd.h"
+
 
 #define MAX_ELEM_IN_BUCKET 50000
 #define NUM_BUCKETS 400
@@ -67,57 +72,6 @@ char buffer[2048];
 int pdim;
 int numocclusionpoints = 0;
 
-int countFloatsInString(const char *fltString)
-/* char *flts - character array of floats 
- Return -1 on a malformed string
- Return the count of the number of floating point numbers
-*/
-{
-  char *end;
-  const char *start = fltString;
-  double d;
-  int count = 0;
-  while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  if (UCHAR(*start) == '\0') return -1; /* Don't ask to convert empty strings */
-  do {
-    d = strtod(start, (char **)&end);
-    if (end == start) { 
-      /* I want to parse strings of numbers with comments at the end */
-      /* This return is executed when the next thing along can't be parsed */
-      return count; 
-    } 
-    count++;   /* Count the number of floats */
-    start = end;  /* Keep converting from the returned position. */
-    while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  } while (UCHAR(*start) != '\0');
-  return count; /* Success */
-}
-
-int getFloatString(int numFloats, const char *flts, float *tgts)
-/* char *flts - character array of floats */
-/* float *tgts - array to save floats */
-{
-  char *end;
-  const char *start = flts;
-  double d;
-  int count = 0;
-  if (countFloatsInString(flts) != numFloats) return 1;
-  while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  do {
-    d = strtod(start, (char **)&end);
-    if (end == start) { 
-      /* Can't do any more conversions on this line */
-      return (count == numFloats) ? 0 : 1;
-    }
-    tgts[count++] = d;   /* Convert from double to float */
-    start = end;  /* Keep converting from the returned position. */
-    while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-    if (count == numFloats) return 0; /* I don't care if there are more on
-			the line as long as I got what I wanted */
-  } while (UCHAR(*start) != '\0');
-  return 0; /* Success */
-}
-
 int mapIndex3D(int r,int c,int z, int nr,int nc,int nz)
 {
   if (c >= nc) return -1;
@@ -138,6 +92,23 @@ int mapIndex2D(int r,int c, int nr,int nc)
   return c + r * nc;
 }
 
+int readNodeData(float* des,FILE *fp) {
+  memset(buffer,0,sizeof(buffer));
+  if (fgets(buffer, sizeof(buffer),fp) != (char *)NULL) {
+    pdim = countFloatsInString(buffer);
+    assert(pdim <= MAXDIM);
+    if (pdim <= 0) return -1;
+    if (getFloatString(pdim,buffer,des) != 0) {
+      fprintf(stderr,"Failed to parse float string\n");
+      return -1; /* failure */
+    }
+  } else {
+    printf("Failed to read pattern\n");
+    return -1; /* failure */
+  }
+
+  return pdim; /* success */
+}
 
 int initializeFromTrainingDataEspacial(FILE *td, int numberDesired, int numberExpected, int nrow, int ncol, int nslice)
 {
@@ -340,23 +311,6 @@ int initializeFromTrainingDataKDT(FILE *td, int numberDesired, int numberExpecte
   return 0; /* Success */
 }
 
-int readNodeData(float* des,FILE *fp) {
-  memset(buffer,0,sizeof(buffer));
-  if (fgets(buffer, sizeof(buffer),fp) != (char *)NULL) {
-    pdim = countFloatsInString(buffer);
-    assert(pdim <= MAXDIM);
-    if (pdim <= 0) return -1;
-    if (getFloatString(pdim,buffer,des) != 0) {
-      fprintf(stderr,"Failed to parse float string\n");
-      return -1; /* failure */
-    }
-  } else {
-    printf("Failed to read pattern\n");
-    return -1; /* failure */
-  }
-
-  return pdim; /* success */
-}
 
 void print_timing(FILE *fp, struct timeval start, struct timeval end) 
 {
@@ -570,7 +524,8 @@ float* geodesicDT3d(char* prototypes,int max1, int max2, int max3, float* maps, 
 int main(int argc, char* argv[]) {
   char *proto;
   float *maps,*domain;
-  int i,col,row,slice,tipo_mapa,num_mapa;
+  int i,col,row,slice,tipo_mapa,num_mapa,c,option_index, debug = 0;
+  struct Header cabecera_input,cabecera_maps;
   int max1 = 256;
   int max2 = 256;
   int max3 = 1;
@@ -580,29 +535,89 @@ int main(int argc, char* argv[]) {
   struct timeval startinit;
   struct timeval endinit;
   struct timeval endtotal;
-  char* trainfile;
+  char sourcefile[200], domainfile[200], outputfile[200];
   int clase,mapindex;
 
-  if (argc != 7) {
-    printf("Uso: geodesicDT3d max1 max2 max3 trainfile domain mapa\n");
+  while (1) {
+    static struct option long_options[] = {
+      {"hx", 1, 0, 0},
+      {"hy", 1, 0, 0},
+      {0, 0, 0, 0}
+    };
+
+    c = getopt_long (argc, argv, "d",long_options, &option_index);
+
+    if (c == -1) {
+      break;
+    }               
+      
+    switch (c) {
+    case 0:            
+      /* printf ("option %s = %f\n", long_options[option_index].name,threshold1);*/
+      break;
+    case 'd':
+      debug = 1;   
+      break;
+    case '?':
+      printf("Author: Ruben Cardenes, Oct 2002\n");
+      printf("Usage: geodesicDT3d [options] sourcefile.txt domain.mhd mapa.mhd\n");
+      printf("              -d (debug mode)\n");
+      return 1;
+      break;
+    
+    default:
+      printf ("?? getopt returned character code 0%o ??\n", c);
+    }
+  }
+  
+  if ((argc - optind) != 3) {
+    printf ("Incorrect number of arguments: ");
+    printf("Author: Ruben Cardenes, Oct 2002 \n");
+    printf("Usage: geodesicDT3d [options] sourcefile.txt domain.mhd mapa.mhd\n");
+    printf("              -d (debug mode)\n");
     return 1;
+  } else {
+    while (optind < argc) {
+      if (sscanf(argv[optind++], "%s", sourcefile) == 0)
+         printf ("Error parsing argument \n");
+      if (sscanf(argv[optind++], "%s", domainfile) == 0)
+         printf ("Error parsing argument \n");
+      if (sscanf(argv[optind++], "%s", outputfile) == 0)
+         printf ("Error parsing argument \n");
+    }
   }
 
-  max1 = atoi(argv[1]);
-  max2 = atoi(argv[2]);
-  max3 = atoi(argv[3]);
-  trainfile = argv[4];
-
   gettimeofday(&startinit,NULL);
+
+  // Read domain
+  //domain = (float*)malloc(sizeof(float)*max1*max2*max3);
+  //fp = fopen(domainfile,"r");
+  //fread(domain,sizeof(float),max1*max2*max3,fp);
+  //fclose(fp);
+
+  // Read domain mhd format 
+  readmhd_header(domainfile, &cabecera_input);
+  std::cout << domainfile << std::endl;
+  std::cout << "Cabecera input type " << cabecera_input.ElementType << std::endl;
+  std::cout << "Cabecera input dims " << cabecera_input.dimsize[0] << std::endl;
+  std::cout << "Cabecera input dims " << cabecera_input.dimsize[1] << std::endl;
+  std::cout << "Cabecera input dims " << cabecera_input.dimsize[2] << std::endl;
+  domain = readraw_float(cabecera_input,domainfile);
+
+  max1 = cabecera_input.dimsize[1];
+  max2 = cabecera_input.dimsize[0];
+  max3 = cabecera_input.dimsize[2];
+
+  maps = (float*)malloc(sizeof(float)*max1*max2*max3);
   proto = (char*)malloc(sizeof(char)*max1*max2*max3);
 
   for (i=0;i<max1*max2*max3;i++) {
     proto[i] = -1;
   }
 
-  fp = fopen(trainfile,"rb");
+  fp = fopen(sourcefile,"rb");
   if (fp == NULL) {
-    fprintf(stderr,"Failed reading prototypes %s\n",trainfile);
+    fprintf(stderr,"Failed reading prototypes %s\n",sourcefile);
     exit(1);
   }
 
@@ -619,12 +634,6 @@ int main(int argc, char* argv[]) {
   }
   fclose(fp);
 
-  maps = (float*)malloc(sizeof(float)*max1*max2*max3);
-  domain = (float*)malloc(sizeof(float)*max1*max2*max3);
-  fp = fopen(argv[5],"r");
-  fread(domain,sizeof(float),max1*max2*max3,fp);
-  fclose(fp);
-
   numasignaciones = 0;
   printf("Entrando en geodesicDT\n");
   gettimeofday(&endinit,NULL);
@@ -635,9 +644,15 @@ int main(int argc, char* argv[]) {
   gettimeofday(&endtotal,NULL);
 
   printf("Escribiendo mapa de distancias\n");
-  fg=fopen(argv[6],"w");
-  fwrite(maps,sizeof(float),max1*max2*max3,fg);    
-  fclose(fg);
+  cabecera_maps = cabecera_input;
+  cabecera_maps.ElementType.assign("MET_FLOAT");
+  writemhd_header(outputfile,&cabecera_maps);
+  writeraw_float(maps,outputfile,cabecera_maps);
+
+  //fg=fopen(outputfile,"w");
+  //fwrite(maps,sizeof(float),max1*max2*max3,fg);    
+  //fclose(fg);
+  
   printf("numocclusionpoints = %d\n",numocclusionpoints);
   
   free(proto);
