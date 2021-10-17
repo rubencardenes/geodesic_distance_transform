@@ -6,6 +6,13 @@
 #include <string.h>
 #include <sys/time.h>
 #include <assert.h>
+#include <getopt.h>
+#include <ctype.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image/stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image/stb_image_write.h"
 
 #define MAX_ELEM_IN_BUCKET 16000
 #define NUM_BUCKETS 400
@@ -56,7 +63,7 @@ char buffer[2048];
 int pdim;
 int numocclusionpoints = 0;
 
-unsigned short* aux_out;
+unsigned char* aux_out;
 
 int countFloatsInString(const char *fltString)
 /* char *flts - character array of floats 
@@ -127,6 +134,66 @@ int mapIndex2D(int r,int c, int nr,int nc)
   if (r >= nr) return -1;
   if (r < 0) return -1;
   return c + r * nc;
+}
+
+
+void read_lut(char* filename, unsigned char** lut) {
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        fprintf(stderr,"Failed reading file %s\n",filename);
+        exit(1);
+    }
+    int index, r, g, b;
+    printf("reading lut\n");
+    fgets(buffer, sizeof(buffer),fp);
+    while (!feof(fp)) {
+      memset(buffer,0,sizeof(buffer));
+      if (fgets(buffer, sizeof(buffer),fp) != (char *)NULL) {
+        // printf("buffer %s\n", buffer);
+        if (sscanf(buffer,"%d\t%d\t%d\t%d", &index, &r, &g, &b) == 0) {
+            continue;
+        }
+      }
+      // printf("index %d RGB %d %d %d\n",index, r,g,b);  
+      lut[0][index] = r;
+      lut[1][index] = g;
+      lut[2][index] = b;
+    }
+    // printf("finish reading lut\n");
+}
+
+void get_redblue_lut(unsigned char** lut) {
+    for (int i=0;i<256;i++) {
+        lut[0][i] = 255 - i;
+        lut[1][i] = 0;
+        lut[2][i] = i;
+    }
+}
+
+void get_random_lut(unsigned char** lut) {
+    for (int i=0;i<256;i++) {
+        lut[0][i] = (int)255*rand();
+        lut[1][i] = (int)255*rand();
+        lut[2][i] = (int)255*rand();
+    }
+}
+
+int readNodeData(float* des,FILE *fp) {
+  memset(buffer,0,sizeof(buffer));
+  if (fgets(buffer, sizeof(buffer),fp) != (char *)NULL) {
+    pdim = countFloatsInString(buffer);
+    assert(pdim <= MAXDIM);
+    if (pdim <= 0) return -1;
+    if (getFloatString(pdim,buffer,des) != 0) {
+      fprintf(stderr,"Failed to parse float string\n");
+      return -1; /* failure */
+    }
+  } else {
+    printf("Failed to read pattern\n");
+    return -1; /* failure */
+  }
+
+  return pdim; /* success */
 }
 
 
@@ -331,24 +398,6 @@ int initializeFromTrainingDataKDT(FILE *td, int numberDesired, int numberExpecte
   return 0; /* Success */
 }
 
-int readNodeData(float* des,FILE *fp) {
-  memset(buffer,0,sizeof(buffer));
-  if (fgets(buffer, sizeof(buffer),fp) != (char *)NULL) {
-    pdim = countFloatsInString(buffer);
-    assert(pdim <= MAXDIM);
-    if (pdim <= 0) return -1;
-    if (getFloatString(pdim,buffer,des) != 0) {
-      fprintf(stderr,"Failed to parse float string\n");
-      return -1; /* failure */
-    }
-  } else {
-    printf("Failed to read pattern\n");
-    return -1; /* failure */
-  }
-
-  return pdim; /* success */
-}
-
 void print_timing(FILE *fp, struct timeval start, struct timeval end) 
 {
   double tuend = 1e-06*(double)end.tv_usec; \
@@ -411,7 +460,7 @@ int propagar8(int mapindex, int max1, int max2, struct bucket *Lista, float* dom
 	      maps[new_mapindex] = distreal + distance(xnew,ynew,Element[mapindex].x,Element[mapindex].y);
 	      
 	      /* codigo control */
-	      aux_out[Element[mapindex].y*max1+Element[mapindex].x] = 1;
+	      aux_out[Element[mapindex].y*max1+Element[mapindex].x] = 255;
 	      /* codigo control */
 
 	    }
@@ -446,7 +495,7 @@ void swap(struct bucket *lista1, struct bucket *lista2) {
   lista2->num_elem = aux;
 }
 
-float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domain) {
+float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domain, float* dmax) {
   int i,j,x,y,l,N,r,count;
   int siguiente,indice_actual;
   int d,mapindex,buckets_empty;
@@ -485,7 +534,7 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
       if (prototypes[count] != -1 && domain[count] == 0) {
 	Proto[l].x= x;
 	Proto[l].y= y;
-        Proto[l].icur = prototypes[count];
+  Proto[l].icur = prototypes[count];
 	Element[count].dobj = 0;
 	Element[count].xobj = x;
 	Element[count].yobj = y;
@@ -538,9 +587,7 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
   }
     
   printf("Distancia maxima alcanzada: %d\n",d); 
-  
-  /* Transformamos mapa de regiones en mapa de clases */
- 
+  *dmax = d;
   /* liberamos memoria */
   free(Proto);
   printf("geodesicDT OK\n");
@@ -551,87 +598,176 @@ int main(int argc, char* argv[]) {
   char *proto;
   float *maps,*domain;
   int i,col,row,tipo_mapa,num_mapa;
-  int max1 = 256;
-  int max2 = 256;
-  int max3 = 1;
+  int width = 256;
+  int height = 256;
+  int depth = 1;
+  int channels = 1;
   int K=1;
   float a,b;
   FILE *fp,*fg;
   struct timeval startinit;
   struct timeval endinit;
   struct timeval endtotal;
-  char* trainfile;
+  char sourcefile[200];
+  char domainfile[200];
+  char outputfile[200];
   int clase;
+  float max_dist = 0;
+  int color_mode = 0;
+  int option_index, c, debug;
+  
+  while (1) {
+    static struct option long_options[] = {
+      {"hx", 1, 0, 0},
+      {"hy", 1, 0, 0},
+      {0, 0, 0, 0}
+    };
 
-  if (argc != 6) {
-    printf("Uso: geodesicDT2D max1 max2 trainfile domain mapa\n");
-    return 1;
+    c = getopt_long (argc, argv, "dc:",long_options, &option_index);
+
+    if (c == -1) {
+      break;
+    }               
+      
+    switch (c) {
+    case 0:      
+      /* printf ("option %s = %f\n", long_options[option_index].name,threshold1);*/
+      break;
+    case 'd':
+      debug = 1;   
+      break;
+    case 'c':
+      color_mode = atoi(optarg);
+      break;
+    case '?':
+      printf("Author: Ruben Cardenes, Oct 2002\n");
+      printf("Usage: geodesicDT2D [options] sourcefile.txt domain.png out.png\n");
+      printf("              -d (debug mode)\n");
+      printf("              -c color output (0: gray, 1: red-blue, 2: random, 3: random)\n");
+      return 1;
+      break;
+    
+    default:
+      printf ("?? getopt returned character code 0%o ??\n", c);
+    }
   }
 
-  max1 = atoi(argv[1]);
-  max2 = atoi(argv[2]);
-  trainfile = argv[3];
+  if ((argc - optind) != 3) {
+    printf ("Incorrect number of arguments: ");
+    printf("Author: Ruben Cardenes, Oct 2002 \n");
+    printf("Usage: geodesicDT2D [options] sourcefile.txt domain.png out.png\n");
+    printf("              -d (debug mode)\n");
+    printf("              -c color output (0: gray, 1: red-blue, 2: random, 3: yellow)\n");
+    return 1;
+  } else {
+    while (optind < argc) {
+      if (sscanf(argv[optind++], "%s", sourcefile) == 0)
+        printf ("Error parsing argument \n");
+      if (sscanf(argv[optind++], "%s", domainfile) == 0)
+        printf ("Error parsing argument \n");
+      if (sscanf(argv[optind++], "%s", outputfile) == 0)
+        printf ("Error parsing argument \n");     
+    }
+  }
+  
+  printf("Reading domain %s \n",domainfile);
+  unsigned char *domain_u = stbi_load(domainfile, &width, &height, &channels, 0);
+  if(domain_u == NULL) {
+        printf("Error in loading the image\n");
+        exit(1);
+  }
+  // Convert to float 
+  domain = (float*)malloc(sizeof(float)*width*height);
+  for (int i=0;i<width*height;i++) {
+     domain[i] = (float)domain_u[i];
+  }
 
   gettimeofday(&startinit,NULL);
-  proto = (char*)malloc(sizeof(char)*max1*max2);
+  proto = (char*)malloc(sizeof(char)*width*height);
 
-  for (i=0;i<max1*max2;i++) {
+  for (i=0;i<width*height;i++) {
     proto[i] = -1;
   }
 
-  fp = fopen(trainfile,"rb");
+  fp = fopen(sourcefile,"rb");
   if (fp == NULL) {
-    fprintf(stderr,"Failed reading prototypes %s\n",trainfile);
+    fprintf(stderr,"Failed reading prototypes %s\n",sourcefile);
     exit(1);
   }
 
-  printf("Leyendo prototipos \n");
-  initializeFromTrainingDataEspacial(fp,100000000,0,max1,max2,max3);
+  printf("Reading source points \n");
+  initializeFromTrainingDataEspacial(fp,100000000,0,width,height,1);
   for (i=0;i<numPrototypes;i++) {   
-    row=(int)prototypeNodeData[i].row;
-    col=(int)prototypeNodeData[i].col;    
+    row=(int)prototypeNodeData[i].row; // x 
+    col=(int)prototypeNodeData[i].col; // y    
     if (prototypeNodeData[i].pclass != 0) {
-      proto[max2*row+col] = (char)prototypeNodeData[i].pclass;
+      proto[width*row+col] = (char)prototypeNodeData[i].pclass;
     }
   }
   fclose(fp);
 
-  maps = (float*)malloc(sizeof(float)*max1*max2);
-  domain = (float*)malloc(sizeof(float)*max1*max2);
+  maps = (float*)malloc(sizeof(float)*width*height);
   /* codigo control */
-  aux_out = (unsigned short*)calloc(max1*max2,sizeof(unsigned short));
-  /* codigo control */
-  fp = fopen(argv[4],"r");
-  fread(domain,sizeof(float),max1*max2,fp);
-  fclose(fp);
-  
-  /* codigo control */
-  float max = -10;
-  float min = 999999;
-  for (int i=0;i<max1*max2;i++) {
-        if (domain[i] > max) {
-            max = domain[i];
-        } 
-        if (domain[i] < min) {
-            min = domain[i];
-        } 
-  }
-  printf("image min %f max %f\n", min, max);
+  if (debug == 1) {
+    aux_out = (unsigned char*)calloc(width*height,sizeof(unsigned char));
+  } 
   /* codigo control */
 
   numasignaciones = 0;
-  printf("Entrando en geodesicDT\n");
+  printf("Doing geodesicDT\n");
   gettimeofday(&endinit,NULL);
-  maps = geodesicDT(proto, max1, max2, maps, domain);
+  maps = geodesicDT(proto, width, height, maps, domain, &max_dist);
   if (maps == (float*)NULL) {
-    printf("Error en DToptimo\n");
+    printf("Error in geodesicDT\n");
   }
   gettimeofday(&endtotal,NULL);
 
-  printf("Escribiendo mapa de distancias\n");
-  fg=fopen(argv[5],"w");
-  fwrite(maps,sizeof(float),max1*max2,fg);    
-  fclose(fg);
+  printf("Writing distance map\n");
+  unsigned char* maps_u;
+  if (color_mode > 0) {
+    unsigned char **lut = (unsigned char**)malloc(sizeof(unsigned char*)*3);
+    for (int i=0;i<3;i++) {
+       lut[i] = (unsigned char*)malloc(sizeof(unsigned char)*256);    
+    }
+    if (color_mode == 1) {
+      get_redblue_lut(lut);
+    }
+    if (color_mode == 2) {
+      get_random_lut(lut);
+    }
+    if (color_mode == 3) {
+      read_lut("cb_bluishgreen.lut", lut);
+    } 
+    channels = 3;    
+    maps_u = (unsigned char*)malloc(sizeof(unsigned char)*width*height*channels); 
+    int j = 0;
+    for (int i=0;i<width*height;i++) {
+       if (domain[i] == 0) {
+         unsigned char value = (unsigned char)(255*maps[i]/max_dist);
+         //unsigned char value = (unsigned char)((int)maps[i]%255);       
+         maps_u[j] = (unsigned char)lut[0][value];
+         maps_u[j+1] = (unsigned char)lut[1][value];
+         maps_u[j+2] = (unsigned char)lut[2][value];
+       } else {
+         maps_u[j] = 0;
+         maps_u[j+1] = 0;
+         maps_u[j+2] = 0;
+       }
+       j = j+3;
+    }
+  } else {
+    maps_u = (unsigned char*)calloc(width*height, sizeof(unsigned char));
+    for (int i=0;i<width*height;i++) {
+       maps_u[i] = (unsigned char)(255*maps[i]/max_dist);
+    }
+  }
+  stbi_write_png(outputfile, width, height, channels, maps_u, width * channels);
+  
+  free(maps);
+  free(maps_u);
+  free(domain);
+  free(domain_u);
+
   printf("numocclusionpoints = %d\n",numocclusionpoints);
   fprintf(stdout,"Initialization time: ");
   print_timing(stdout, startinit, endinit);
@@ -640,10 +776,10 @@ int main(int argc, char* argv[]) {
   /* printf("numasignaciones = %d, asignacionesraras =%d, numrechazos =%d\n", numasignaciones,asignacionesraras,numrechazos); */
 
   /* codigo control */
-  fp = fopen("occlusion_points.ush","w");
-  fwrite(aux_out,sizeof(unsigned short),max1*max2,fp);
-  fclose(fp);
-  free(aux_out);
+  if (debug == 1) {
+    stbi_write_png("occlusion_points.png", width, height, 1, aux_out, width * 1);
+    free(aux_out);
+  }
   /* codigo control */
 
   printf("OK\n");
