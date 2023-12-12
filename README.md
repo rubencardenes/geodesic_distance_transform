@@ -38,19 +38,31 @@ geodesicDT2d -c 2 example_data/source_2D_01.txt example_data/domain256_3.png out
 geodesicDT2d -c 3 example_data/source_2D_01.txt example_data/domain256_4.png output04.png
 geodesicDT2d -c 0 example_data/source_2D_01.txt example_data/domain512_3.png output05.png
 ```
-![domain1](example_data/domain256_1.png) ![output1](output01.png) <br> 
-![domain2](example_data/domain256_2.png) ![output2](output02.png) <br> 
-![domain3](example_data/domain256_3.png) ![output3](output03.png) <br>
-![domain4](example_data/domain256_4.png) ![output4](output04.png) <br>
-![domain5](example_data/domain512_3.png) ![output5](output05.png) <br>
+
+![domain1](example_data/domain256_1.png) ![output1](outputs/output01.png) <br> 
+![domain2](example_data/domain256_2.png) ![output2](outputs/output02.png) <br> 
+![domain3](example_data/domain256_3.png) ![output3](outputs/output03.png) <br>
+![domain4](example_data/domain256_4.png) ![output4](outputs/output04.png) <br>
+![domain5](example_data/domain512_3.png) ![output5](outputs/output05.png) <br>
 
 Example for several points (4 points)
 ```
 geodesicDT2d -c 2 example_data/source_2D_4_points.txt example_data/domain256_1.png output06.png
 ```
-![domain6](example_data/domain256_1.png) ![output6](output06.png) <br>
+![domain6](example_data/domain256_1.png) ![output6](outputs/output06.png) <br>
 
 
+# Python wrapper 
+
+```py
+from geodesicDT2d import run_geodesic2dDT_wrapper
+
+debug = 0
+color_mode = 0
+run_geodesic2dDT_wrapper('example_data/source_2D_02.txt','example_data/domain256_1.png','output01.png', color_mode, debug)
+color_mode = 1
+run_geodesic2dDT_wrapper('example_data/source_2D_03.txt','example_data/domain256_2.png','output02.png', color_mode, debug)
+```
 ## 3D version 
 This version is implemented in C and C++ 
 

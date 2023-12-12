@@ -1,0 +1,4 @@
+geodesicDT2d
+geodesicDT3d
+*.o
+.vscode/
