@@ -661,7 +661,7 @@ int main(int argc, char* argv[]) {
 
   fprintf(stdout,"Initialization time: ");
   print_timing(stdout, startinit, endinit);
-  fprintf(stdout,"geodesic DT time: ");
+  fprintf(stdout,"geodesic DT 3D time: ");
   print_timing(stdout, endinit, endtotal);
   /* printf("numasignaciones = %d, asignacionesraras =%d, numrechazos =%d\n", numasignaciones,asignacionesraras,numrechazos); */
 
