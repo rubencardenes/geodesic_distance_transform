@@ -61,7 +61,6 @@ int actualDimension;
 int numPrototypesInClass[MAXCLASSNUMBER];
 char buffer[2048];
 int pdim;
-int numocclusionpoints = 0;
 
 unsigned char* aux_out;
 
@@ -411,7 +410,8 @@ float distance(int x1,int y1,int x2,int y2) {
   return sqrt ((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2));
 }
 
-int propagar8(int mapindex, int max1, int max2, struct bucket *Lista, float* domain, int dcur,struct element *Element,float* maps) {
+int propagar8(int mapindex, int max1, int max2, struct bucket *Lista, float* domain, 
+              int dcur,struct element *Element,float* maps, int *numocclusionpoints, int debug) {
   float distreal;
   int new_mapindex,dist,x,y,siguiente,siguiente_obj;
   int ynew,xnew,i;
@@ -422,49 +422,50 @@ int propagar8(int mapindex, int max1, int max2, struct bucket *Lista, float* dom
       ynew = Element[mapindex].y + y;
       xnew = Element[mapindex].x + x;
       if (ynew >=0 && xnew >=0
-	  && ynew < max1 && xnew < max2 ) {
-	new_mapindex = ynew*max2 + xnew;
-	if (domain[new_mapindex] == 0 && maps[new_mapindex] == -1) {	 
-	  distreal = distance(xnew,ynew,Element[mapindex].xobj,Element[mapindex].yobj) + Element[mapindex].dobj;
-	  dist = round(distreal);		
-	    if (dist == dcur+1) {
-	      /*printf("xnew %d ynew %d xobj %d yobj %d dist %d distreal %f\n",xnew,ynew,Element_p.xobj,Element_p.yobj,dist,distreal);*/
-	      siguiente = Lista[1].num_elem;
-	      if (siguiente >= MAX_ELEM_IN_BUCKET) {
-		printf("Excedidos num elem in bucket \n");
-		return 1;
-	      }
-	      Element[new_mapindex].xobj = Element[mapindex].xobj;
-	      Element[new_mapindex].yobj = Element[mapindex].yobj;
-	      Element[new_mapindex].dobj = Element[mapindex].dobj;
-	      Lista[1].index_elem[siguiente] = new_mapindex ;	      
-	      Lista[1].num_elem++;
-	      /* maps[new_mapindex] = dist; */
-	      maps[new_mapindex] = distreal;
-	    }	   
-	    if (dist <= dcur) {
-	      /* printf("cambio de objeto en x %d y %d, xnew %d ynew %d, dist %d, distreal %f Element[mapindex]: dobj %f xobj %d yobj %d\n",Element[mapindex].x,Element[mapindex].y,xnew,ynew,dist,distreal,Element[mapindex].dobj,Element[mapindex].xobj,Element[mapindex].yobj); */
-	      numocclusionpoints++;
-	      siguiente = Lista[2].num_elem;
-	      if (siguiente >= MAX_ELEM_IN_BUCKET) {
-		printf("Excedidos num elem in bucket \n");
-		return 1;
-	      }
-	      Element[new_mapindex].xobj = Element[mapindex].x;
-	      Element[new_mapindex].yobj = Element[mapindex].y;
-	      Element[new_mapindex].dobj = distreal;
-	      Element[mapindex].dobj = distreal; 
-	      Lista[2].index_elem[siguiente] = new_mapindex;
-	      Lista[2].num_elem++;
-	      /*maps[new_mapindex] = round(distreal + distance(xnew,ynew,Element[mapindex].x,Element[mapindex].y)); */
-	      maps[new_mapindex] = distreal + distance(xnew,ynew,Element[mapindex].x,Element[mapindex].y);
-	      
-	      /* codigo control */
-	      aux_out[Element[mapindex].y*max1+Element[mapindex].x] = 255;
-	      /* codigo control */
+	        && ynew < max1 && xnew < max2 ) {
+	      new_mapindex = ynew*max2 + xnew;
+	      if (domain[new_mapindex] == 0 && maps[new_mapindex] == -1) {	 
+          distreal = distance(xnew,ynew,Element[mapindex].xobj,Element[mapindex].yobj) + Element[mapindex].dobj;
+          dist = round(distreal);		
+          if (dist == dcur+1) {
+            /*printf("xnew %d ynew %d xobj %d yobj %d dist %d distreal %f\n",xnew,ynew,Element_p.xobj,Element_p.yobj,dist,distreal);*/
+            siguiente = Lista[1].num_elem;
+	        if (siguiente >= MAX_ELEM_IN_BUCKET) {
+		        printf("Excedidos num elem in bucket \n");
+		        return 1;
+	        }
+          Element[new_mapindex].xobj = Element[mapindex].xobj;
+          Element[new_mapindex].yobj = Element[mapindex].yobj;
+          Element[new_mapindex].dobj = Element[mapindex].dobj;
+          Lista[1].index_elem[siguiente] = new_mapindex ;	      
+          Lista[1].num_elem++;
+          /* maps[new_mapindex] = dist; */
+          maps[new_mapindex] = distreal;
+        }	   
+        if (dist <= dcur) {
+          // printf("cambio de objeto en x %d y %d, xnew %d ynew %d, dist %d, distreal %f Element[mapindex]: dobj %f xobj %d yobj %d\n",Element[mapindex].x,Element[mapindex].y,xnew,ynew,dist,distreal,Element[mapindex].dobj,Element[mapindex].xobj,Element[mapindex].yobj);
+          (*numocclusionpoints)++;
+          siguiente = Lista[2].num_elem;
+          if (siguiente >= MAX_ELEM_IN_BUCKET) {
+              printf("Excedidos num elem in bucket \n");
+              return 1;
+          }
+          Element[new_mapindex].xobj = Element[mapindex].x;
+          Element[new_mapindex].yobj = Element[mapindex].y;
+          Element[new_mapindex].dobj = distreal;
+          Element[mapindex].dobj = distreal; 
+          Lista[2].index_elem[siguiente] = new_mapindex;
+          Lista[2].num_elem++;
+          /*maps[new_mapindex] = round(distreal + distance(xnew,ynew,Element[mapindex].x,Element[mapindex].y)); */
+          maps[new_mapindex] = distreal + distance(xnew,ynew,Element[mapindex].x,Element[mapindex].y);
+          /* codigo control */
+          if (debug == 1) {
+            aux_out[Element[mapindex].y*max1+Element[mapindex].x] = 255;
+          }
+          /* codigo control */
 
-	    }
-	}
+	        }
+	      }
       } 
     }
   }
@@ -495,7 +496,7 @@ void swap(struct bucket *lista1, struct bucket *lista2) {
   lista2->num_elem = aux;
 }
 
-float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domain, float* dmax) {
+float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domain, float* dmax, int debug) {
   int i,j,x,y,l,N,r,count;
   int siguiente,indice_actual;
   int d,mapindex,buckets_empty;
@@ -506,6 +507,7 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
   float** im;
   float distancia_from_l,distancia_ultima;
   FILE *fp,*fpdist;
+  int numocclusionpoints = 0;
 
   /* inicializamos el mapa de distancias a -1 */ 
   for (j=0;j<max1*max2;j++) {
@@ -564,7 +566,7 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
       /* Sacamos elemento de lista 0 */
       /* printf("Obteniendo de bucket: %d\n",d); */
       siguiente = Lista[0].num_elem-1;
-      /* printf("num_elem = %d \n",Bucket[d].num_elem); */
+      /* printf("num_elem = %d \n",Lista[0].num_elem);*/
       indice_actual = Lista[0].index_elem[siguiente];
       Lista[0].index_elem[siguiente] = -1;
       Lista[0].num_elem--;
@@ -573,8 +575,8 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
         printf("Error extrano mapindex %d != indice_actual %d\n",mapindex,indice_actual);
         return (float*)NULL;
       }
-      /*printf("propagando mapindex %d x %d y %d \n",mapindex,Element[mapindex].x,Element[mapindex].y);*/
-      propagar8(mapindex, max1, max2, Lista, domain, d, Element, maps);   
+      // printf("propagando mapindex %d x %d y %d \n",mapindex,Element[mapindex].x,Element[mapindex].y);
+      propagar8(mapindex, max1, max2, Lista, domain, d, Element, maps, &numocclusionpoints, debug);   
     }
     d++;
     swap(&Lista[0],&Lista[1]);
@@ -583,10 +585,11 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
       volcar(&Lista[2],&Lista[0]);
     }
     if (Lista[0].num_elem == 0 && Lista[1].num_elem == 0) break;
-    /* if (d==43) break; */
+    // if (d == 40) break;
   }
     
   printf("Distancia maxima alcanzada: %d\n",d); 
+  printf("numocclusionpoints = %d\n",numocclusionpoints);
   *dmax = d;
   /* liberamos memoria */
   free(Proto);
@@ -594,7 +597,7 @@ float* geodesicDT(char* prototypes,int max1, int max2, float* maps, float* domai
   return maps;
 }
 
-int main(int argc, char* argv[]) {
+void run_geodesic2dDT(char* sourcefile, char* domainfile, char* outputfile, int color_mode, int debug) {
   char *proto;
   float *maps,*domain;
   int i,col,row,tipo_mapa,num_mapa;
@@ -603,16 +606,134 @@ int main(int argc, char* argv[]) {
   int depth = 1;
   int channels = 1;
   int K=1;
-  float a,b;
-  FILE *fp,*fg;
   struct timeval startinit;
   struct timeval endinit;
   struct timeval endtotal;
-  char sourcefile[200];
-  char domainfile[200];
-  char outputfile[200];
-  int clase;
   float max_dist = 0;
+  FILE *fp,*fg;
+
+  printf("Reading domain %s \n",domainfile);
+  unsigned char *domain_u = stbi_load(domainfile, &width, &height, &channels, 0);
+  if(domain_u == NULL) {
+        printf("Error in loading the image\n");
+        exit(1);
+  }
+  printf("Domain width %d height %d\n",width, height);
+
+  // Convert to float 
+  domain = (float*)malloc(sizeof(float)*width*height);
+  for (int i=0;i<width*height;i++) {
+     domain[i] = (float)domain_u[i];
+  }
+
+  gettimeofday(&startinit,NULL);
+  proto = (char*)malloc(sizeof(char)*width*height);
+
+  for (i=0;i<width*height;i++) {
+    proto[i] = -1;
+  }
+
+  fp = fopen(sourcefile,"rb");
+  if (fp == NULL) {
+    fprintf(stderr,"Failed reading prototypes %s\n",sourcefile);
+    exit(1);
+  }
+
+  printf("Reading source points \n");
+  initializeFromTrainingDataEspacial(fp,100000000,0,width,height,1);
+  for (i=0;i<numPrototypes;i++) {   
+    row=(int)prototypeNodeData[i].row; // x 
+    col=(int)prototypeNodeData[i].col; // y    
+    if (prototypeNodeData[i].pclass != 0) {
+      proto[width*row+col] = (char)prototypeNodeData[i].pclass;
+    }
+  }
+  fclose(fp);
+
+  maps = (float*)malloc(sizeof(float)*width*height);
+  /* codigo control */
+  if (debug == 1) {
+    aux_out = (unsigned char*)calloc(width*height,sizeof(unsigned char));
+  } 
+  /* codigo control */
+
+  numasignaciones = 0;
+  printf("Doing geodesicDT\n");
+  gettimeofday(&endinit,NULL);
+  maps = geodesicDT(proto, width, height, maps, domain, &max_dist, debug);
+  if (maps == (float*)NULL) {
+    printf("Error in geodesicDT\n");
+  }
+  gettimeofday(&endtotal,NULL);
+
+  printf("Writing distance map\n");
+  unsigned char* maps_u;
+  if (color_mode > 0) {
+    unsigned char **lut = (unsigned char**)malloc(sizeof(unsigned char*)*3);
+    for (int i=0;i<3;i++) {
+       lut[i] = (unsigned char*)malloc(sizeof(unsigned char)*256);    
+    }
+    if (color_mode == 1) {
+      get_redblue_lut(lut);
+    }
+    if (color_mode == 2) {
+      get_random_lut(lut);
+    }
+    if (color_mode == 3) {
+      read_lut("cb_bluishgreen.lut", lut);
+    } 
+    channels = 3;    
+    maps_u = (unsigned char*)malloc(sizeof(unsigned char)*width*height*channels); 
+    int j = 0;
+    for (int i=0;i<width*height;i++) {
+       if (domain[i] == 0) {
+         unsigned char value = (unsigned char)(255*maps[i]/max_dist);
+         //unsigned char value = (unsigned char)((int)maps[i]%255);       
+         maps_u[j] = (unsigned char)lut[0][value];
+         maps_u[j+1] = (unsigned char)lut[1][value];
+         maps_u[j+2] = (unsigned char)lut[2][value];
+       } else {
+         maps_u[j] = 0;
+         maps_u[j+1] = 0;
+         maps_u[j+2] = 0;
+       }
+       j = j+3;
+    }
+  } else {
+    maps_u = (unsigned char*)calloc(width*height, sizeof(unsigned char));
+    for (int i=0;i<width*height;i++) {
+       maps_u[i] = (unsigned char)(255*maps[i]/max_dist);
+    }
+  }
+  stbi_write_png(outputfile, width, height, channels, maps_u, width * channels);
+  
+  free(maps);
+  free(maps_u);
+  free(domain);
+  free(domain_u);
+
+  fprintf(stdout,"Initialization time: ");
+  print_timing(stdout, startinit, endinit);
+  fprintf(stdout,"geodesic DT time: ");
+  print_timing(stdout, endinit, endtotal);
+  /* printf("numasignaciones = %d, asignacionesraras =%d, numrechazos =%d\n", numasignaciones,asignacionesraras,numrechazos); */
+
+  /* codigo control */
+  if (debug == 1) {
+    stbi_write_png("occlusion_points.png", width, height, 1, aux_out, width * 1);
+    free(aux_out);
+  }
+  /* codigo control */
+}
+
+
+int main(int argc, char* argv[]) {
+  
+  float a,b;
+  char sourcefile[300];
+  char domainfile[300];
+  char outputfile[300];
+  int clase;
   int color_mode = 0;
   int option_index, c, debug;
   
@@ -670,118 +791,8 @@ int main(int argc, char* argv[]) {
     }
   }
   
-  printf("Reading domain %s \n",domainfile);
-  unsigned char *domain_u = stbi_load(domainfile, &width, &height, &channels, 0);
-  if(domain_u == NULL) {
-        printf("Error in loading the image\n");
-        exit(1);
-  }
-  // Convert to float 
-  domain = (float*)malloc(sizeof(float)*width*height);
-  for (int i=0;i<width*height;i++) {
-     domain[i] = (float)domain_u[i];
-  }
-
-  gettimeofday(&startinit,NULL);
-  proto = (char*)malloc(sizeof(char)*width*height);
-
-  for (i=0;i<width*height;i++) {
-    proto[i] = -1;
-  }
-
-  fp = fopen(sourcefile,"rb");
-  if (fp == NULL) {
-    fprintf(stderr,"Failed reading prototypes %s\n",sourcefile);
-    exit(1);
-  }
-
-  printf("Reading source points \n");
-  initializeFromTrainingDataEspacial(fp,100000000,0,width,height,1);
-  for (i=0;i<numPrototypes;i++) {   
-    row=(int)prototypeNodeData[i].row; // x 
-    col=(int)prototypeNodeData[i].col; // y    
-    if (prototypeNodeData[i].pclass != 0) {
-      proto[width*row+col] = (char)prototypeNodeData[i].pclass;
-    }
-  }
-  fclose(fp);
-
-  maps = (float*)malloc(sizeof(float)*width*height);
-  /* codigo control */
-  if (debug == 1) {
-    aux_out = (unsigned char*)calloc(width*height,sizeof(unsigned char));
-  } 
-  /* codigo control */
-
-  numasignaciones = 0;
-  printf("Doing geodesicDT\n");
-  gettimeofday(&endinit,NULL);
-  maps = geodesicDT(proto, width, height, maps, domain, &max_dist);
-  if (maps == (float*)NULL) {
-    printf("Error in geodesicDT\n");
-  }
-  gettimeofday(&endtotal,NULL);
-
-  printf("Writing distance map\n");
-  unsigned char* maps_u;
-  if (color_mode > 0) {
-    unsigned char **lut = (unsigned char**)malloc(sizeof(unsigned char*)*3);
-    for (int i=0;i<3;i++) {
-       lut[i] = (unsigned char*)malloc(sizeof(unsigned char)*256);    
-    }
-    if (color_mode == 1) {
-      get_redblue_lut(lut);
-    }
-    if (color_mode == 2) {
-      get_random_lut(lut);
-    }
-    if (color_mode == 3) {
-      read_lut("cb_bluishgreen.lut", lut);
-    } 
-    channels = 3;    
-    maps_u = (unsigned char*)malloc(sizeof(unsigned char)*width*height*channels); 
-    int j = 0;
-    for (int i=0;i<width*height;i++) {
-       if (domain[i] == 0) {
-         unsigned char value = (unsigned char)(255*maps[i]/max_dist);
-         //unsigned char value = (unsigned char)((int)maps[i]%255);       
-         maps_u[j] = (unsigned char)lut[0][value];
-         maps_u[j+1] = (unsigned char)lut[1][value];
-         maps_u[j+2] = (unsigned char)lut[2][value];
-       } else {
-         maps_u[j] = 0;
-         maps_u[j+1] = 0;
-         maps_u[j+2] = 0;
-       }
-       j = j+3;
-    }
-  } else {
-    maps_u = (unsigned char*)calloc(width*height, sizeof(unsigned char));
-    for (int i=0;i<width*height;i++) {
-       maps_u[i] = (unsigned char)(255*maps[i]/max_dist);
-    }
-  }
-  stbi_write_png(outputfile, width, height, channels, maps_u, width * channels);
+  run_geodesic2dDT(sourcefile, domainfile, outputfile, color_mode, debug);
   
-  free(maps);
-  free(maps_u);
-  free(domain);
-  free(domain_u);
-
-  printf("numocclusionpoints = %d\n",numocclusionpoints);
-  fprintf(stdout,"Initialization time: ");
-  print_timing(stdout, startinit, endinit);
-  fprintf(stdout,"geodesic DT time: ");
-  print_timing(stdout, endinit, endtotal);
-  /* printf("numasignaciones = %d, asignacionesraras =%d, numrechazos =%d\n", numasignaciones,asignacionesraras,numrechazos); */
-
-  /* codigo control */
-  if (debug == 1) {
-    stbi_write_png("occlusion_points.png", width, height, 1, aux_out, width * 1);
-    free(aux_out);
-  }
-  /* codigo control */
-
   printf("OK\n");
 }
 
