@@ -1,9 +1,6 @@
 /* Copyright (c) Ruben Cardenes Almeida 08/1/2010 */
 #include <string>
-
-#ifndef UCHAR
-#define UCHAR(c) ((unsigned char)(c))
-#endif
+#include "geodesic_common.h"
 
 struct Header {
 	std::string ObjectType;
@@ -29,7 +26,5 @@ unsigned char* readraw_uchar(struct Header cabecera, std::string filename_mhd);
 void writemhd_header(std::string filename, struct Header *cabecera);
 void writeraw_uchar(unsigned char* output,std::string filename_mhd, struct Header cabecera);
 void writeraw_float(float* output,std::string filename_mhd, struct Header cabecera);
-int getFloatString(int numFloats, const char *flts, float *tgts);
-int countFloatsInString(const char *fltString);
 
 

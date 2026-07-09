@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <iostream>
 #include "io_mhd.h"
+#include "geodesic_common.h"
 
 
 #define MAX_ELEM_IN_BUCKET 50000
@@ -17,9 +18,6 @@
 #define MAXPATTERNS (16384*4)
 #define MAXCLASSNUMBER MAXPATTERNS
 #define MAXDIM 20
-#ifndef UCHAR
-#define UCHAR(c) ((unsigned char)(c))
-#endif
 
 #define round(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 
@@ -71,26 +69,6 @@ int numPrototypesInClass[MAXCLASSNUMBER];
 char buffer[2048];
 int pdim;
 int numocclusionpoints = 0;
-
-int mapIndex3D(int r,int c,int z, int nr,int nc,int nz)
-{
-  if (c >= nc) return -1;
-  if (c < 0) return -1;
-  if (r >= nr) return -1;
-  if (r < 0) return -1;
-  if (z >= nz) return -1;
-  if (z < 0) return -1;
-  return c + r * nc + z * nr * nc;
-}
-
-int mapIndex2D(int r,int c, int nr,int nc)
-{
-  if (c >= nc) return -1;
-  if (c < 0) return -1;
-  if (r >= nr) return -1;
-  if (r < 0) return -1;
-  return c + r * nc;
-}
 
 int readNodeData(float* des,FILE *fp) {
   memset(buffer,0,sizeof(buffer));
@@ -319,14 +297,6 @@ void print_timing(FILE *fp, struct timeval start, struct timeval end)
   double tend = end.tv_sec + tuend;\
   double tstart = start.tv_sec + tustart;\
   fprintf(fp,"Elapsed time: %g\n", (tend - tstart) ); \
-}
-
-float distance(int x1,int y1,int x2,int y2) {
-  return sqrt ((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2));
-}
-
-float distance3d(int x1,int y1,int z1, int x2,int y2,int z2) {
-  return sqrt ((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2) + (z1-z2) * (z1-z2));
 }
 
 int propagar26(int mapindex, int max1, int max2, int max3, struct bucket *Lista, float* domain, int dcur,struct element3d *Element,float* maps) {

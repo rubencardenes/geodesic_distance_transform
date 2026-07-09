@@ -68,7 +68,7 @@ This version is implemented in C and C++
 
 Usage:
 ```
-geodesicDT3d [options] source_points.txt domain_image.mhf output_image.mhd
+geodesicDT3d [options] source_points.txt domain_image.mhd output_image.mhd
 ```
 
 - source_points: txt file with coordinates of source points
@@ -79,20 +79,30 @@ This 3D version uses input and output format in metaheader format, which is just
 
 Example With opened domain (11 source points):
 ```
-geodesicDT3d example_data/source_3D_01.txt example_data/domain3d_80_01.mhd out.mhd
+geodesicDT3d example_data/source_3D_01.txt example_data/domain3D_80_01.mhd out.mhd
 ```
 
 Example With closed domain (9 source points):
 ```
-geodesicDT3d example_data/source_3D_02.txt example_data/domain3d_80_02.mhd out.mhd
+geodesicDT3d example_data/source_3D_02.txt example_data/domain3D_80_02.mhd out.mhd
 ```
 
 ## Notes
 For both versions the input and output are a list of single points defined in a txt file. The code can be easily modified to accept an arbitrary set of pixels given as an image. 
 The domain region of interest are always pixels equal to zero
 
+## Testing
+```
+make          # builds geodesicDT2d, geodesicDT3d, and libgeodesicDT2d (used by the Python wrapper)
+make test     # builds and runs the C unit tests for geodesic_common.c
+tests/smoke_test.sh              # end-to-end CLI smoke tests against example_data
+pip install -r tests/requirements.txt
+pytest tests/test_python_wrapper.py   # tests for the Python ctypes wrapper
+```
+These all run automatically on every push/PR via GitHub Actions (see `.github/workflows/ci.yml`).
+
 ## License
-This code is released under the MIT license. 
+This code is released under the MIT license, see [LICENSE](LICENSE). 
 
 If you use this work for academic or commercial use, please cite the paper: 
   Occlusion Points Propagation Geodesic Distance Transformation, ICIP 2003

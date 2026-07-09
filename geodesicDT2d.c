@@ -14,14 +14,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image/stb_image_write.h"
 
+#include "geodesic_common.h"
+
 #define MAX_ELEM_IN_BUCKET 16000
 #define NUM_BUCKETS 400
 #define MAXPATTERNS (16384*4)
 #define MAXCLASSNUMBER MAXPATTERNS
 #define MAXDIM 20
-#ifndef UCHAR
-#define UCHAR(c) ((unsigned char)(c))
-#endif
 
 #define round(x) ((x)>=0?(long)((x)+0.5):(long)((x)-0.5))
 
@@ -63,78 +62,6 @@ char buffer[2048];
 int pdim;
 
 unsigned char* aux_out;
-
-int countFloatsInString(const char *fltString)
-/* char *flts - character array of floats 
- Return -1 on a malformed string
- Return the count of the number of floating point numbers
-*/
-{
-  char *end;
-  const char *start = fltString;
-  double d;
-  int count = 0;
-  while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  if (UCHAR(*start) == '\0') return -1; /* Don't ask to convert empty strings */
-  do {
-    d = strtod(start, (char **)&end);
-    if (end == start) { 
-      /* I want to parse strings of numbers with comments at the end */
-      /* This return is executed when the next thing along can't be parsed */
-      return count; 
-    } 
-    count++;   /* Count the number of floats */
-    start = end;  /* Keep converting from the returned position. */
-    while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  } while (UCHAR(*start) != '\0');
-  return count; /* Success */
-}
-
-int getFloatString(int numFloats, const char *flts, float *tgts)
-/* char *flts - character array of floats */
-/* float *tgts - array to save floats */
-{
-  char *end;
-  const char *start = flts;
-  double d;
-  int count = 0;
-  if (countFloatsInString(flts) != numFloats) return 1;
-  while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-  do {
-    d = strtod(start, (char **)&end);
-    if (end == start) { 
-      /* Can't do any more conversions on this line */
-      return (count == numFloats) ? 0 : 1;
-    }
-    tgts[count++] = d;   /* Convert from double to float */
-    start = end;  /* Keep converting from the returned position. */
-    while ((UCHAR(*start) != '\0') && isspace(UCHAR(*start))) { start++; }
-    if (count == numFloats) return 0; /* I don't care if there are more on
-			the line as long as I got what I wanted */
-  } while (UCHAR(*start) != '\0');
-  return 0; /* Success */
-}
-
-int mapIndex3D(int r,int c,int z, int nr,int nc,int nz)
-{
-  if (c >= nc) return -1;
-  if (c < 0) return -1;
-  if (r >= nr) return -1;
-  if (r < 0) return -1;
-  if (z >= nz) return -1;
-  if (z < 0) return -1;
-  return c + r * nc + z * nr * nc;
-}
-
-int mapIndex2D(int r,int c, int nr,int nc)
-{
-  if (c >= nc) return -1;
-  if (c < 0) return -1;
-  if (r >= nr) return -1;
-  if (r < 0) return -1;
-  return c + r * nc;
-}
-
 
 void read_lut(char* filename, unsigned char** lut) {
     FILE *fp = fopen(filename, "rb");
@@ -404,10 +331,6 @@ void print_timing(FILE *fp, struct timeval start, struct timeval end)
   double tend = end.tv_sec + tuend;\
   double tstart = start.tv_sec + tustart;\
   fprintf(fp,"Elapsed time: %g\n", (tend - tstart) ); \
-}
-
-float distance(int x1,int y1,int x2,int y2) {
-  return sqrt ((x1-x2) * (x1-x2) + (y1-y2) * (y1-y2));
 }
 
 int propagar8(int mapindex, int max1, int max2, struct bucket *Lista, float* domain, 
@@ -735,7 +658,7 @@ int main(int argc, char* argv[]) {
   char outputfile[300];
   int clase;
   int color_mode = 0;
-  int option_index, c, debug;
+  int option_index, c, debug = 0;
   
   while (1) {
     static struct option long_options[] = {

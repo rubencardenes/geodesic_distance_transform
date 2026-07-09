@@ -1,4 +1,11 @@
 geodesicDT2d
 geodesicDT3d
 *.o
+*.so
+*.dylib
 .vscode/
+outputs/out.mhd
+outputs/out.raw
+__pycache__/
+tests/test_geodesic_common
+.pytest_cache/
